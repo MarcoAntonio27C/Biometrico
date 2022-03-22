@@ -17,8 +17,9 @@ namespace Biometrico
     public partial class Asistencia : CaptureForm
     {
         private DPFP.Template Template;
-        private DPFP.Verification.Verification  verification;
-        private string urlApi = "https://localhost:44357/api/Empleados";
+        private DPFP.Verification.Verification  verificator;
+        private string urlApiEmpleados = "https://localhost:44357/api/Empleados";
+        private string urlApiAsistencia = "https://localhost:44357/api/Asistencias";
 
         public void Verify(DPFP.Template template)
         {
@@ -30,7 +31,7 @@ namespace Biometrico
         {
             base.Init();
             base.Text = "Verificacion de Huella Digital";
-            verification = new DPFP.Verification.Verification();
+            verificator = new DPFP.Verification.Verification();
             UpdateStatus(0);
         }
 
@@ -59,15 +60,42 @@ namespace Biometrico
                 try
                 {
                     var res = GetEmpleados();
+                  
                     if (!res.Equals(null))
                     {
 
-                        string var = res.Content;
+                        var empleados = JsonConvert.DeserializeObject<List<Empleado>>(res.Content);
+                        bool found = false;
+                        foreach (var empl in empleados)
+                        {
+                            byte[] huella = Convert.FromBase64String(empl.huella);
+                            stream = new MemoryStream(huella);
+                            template = new DPFP.Template(stream);
+                            verificator.Verify(features, template, ref result);
+                            UpdateStatus(result.FARAchieved);
 
-                        Empleado empleado = JsonConvert.DeserializeObject<Empleado>(res.Content);
+                            if (result.Verified)
+                            {
+                                found = true;
+                                var asistencia = RegistrarAsistencia(empl);
+                                if (!asistencia.Equals(null) && (!asistencia.IsSuccessful.Equals(false)))
+                                {
+                                    MessageBox.Show("" + empl.nombreCompleto+" Se Registro tu asistencia a las: "+ DateTime.Now.ToString());
+                                    break;
+                                }
+                                else
+                                {
+                                    MessageBox.Show("Ocurrio algo innesperado: " + asistencia.StatusCode.ToString()+ " ");
+                                }
+                                break;
+                            }
 
-                      MessageBox.Show("");
-                
+                        }
+
+                        if(found == false)
+                        {
+                            MessageBox.Show("Usuario no encontrado, intentelo de nuevo por favor");
+                        }
                        
                     }
                     else
@@ -87,7 +115,7 @@ namespace Biometrico
         {
             try
             {
-                var client = new RestClient(urlApi);
+                var client = new RestClient(urlApiEmpleados);
                 var request = new RestRequest("", Method.GET);
 
               //  request.RequestFormat = DataFormat.Json;
@@ -109,12 +137,42 @@ namespace Biometrico
             InitializeComponent();
         }
 
+        private IRestResponse RegistrarAsistencia(Empleado empleado)
+        {
+            try
+            {
+
+              //  string hora = "2019-07-26T00:00:00";
+
+                var hora = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss");
+                var client = new RestClient(urlApiAsistencia);
+                var request = new RestRequest("",Method.POST);
+                request.RequestFormat = DataFormat.Json;
+
+                request.AddJsonBody(new
+                {
+                    fechaHora = $"{hora}",
+                    empleadoId = $"{empleado.Id}"
+
+                });
+
+                var response = client.Execute(request);
+                return response;
+            }
+            catch(Exception ex)
+            {
+                MessageBox.Show("" + ex);
+                return null;
+            }
+        }
+
     }
 
+    [Serializable]
     public class Empleado
     {
         public Guid Id { get; set; }
-        public string NombreCompleto { get; set; }
-        public string Huella { get; set; }
+        public string nombreCompleto { get; set; }
+        public string huella { get; set; }
     }
 }

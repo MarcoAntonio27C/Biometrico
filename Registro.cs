@@ -54,7 +54,7 @@ namespace Biometrico
                 if (Template != null)
                 {
                     
-                    imgHuella.Image = System.Drawing.Image.FromFile("C:/Users/Ast/Downloads/huellaCorrecta.png");
+                  //  imgHuella.Image = System.Drawing.Image.FromFile("C:/Users/Ast/Downloads/huellaCorrecta.png");
                     MessageBox.Show("Huella Capturada Correctamente");
                 }
                 else
